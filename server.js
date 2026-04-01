@@ -26,9 +26,14 @@ let sessions = {};
 const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-        user: "endi4473@gmail.com",
-        pass: "Suka01"
+        user: "orixclan01@gmail.com",
+        pass: "Suka_011" 
     }
+});
+
+// 🏠 HOME ROUTE
+app.get("/", (req, res) => {
+    res.send("Backend is running 🔥");
 });
 
 // 📩 SEND MESSAGE
@@ -56,7 +61,7 @@ app.post("/request-otp", async (req, res) => {
 
     try {
         await transporter.sendMail({
-            from: "endi4473@gmail.com",
+            from: "orixclan01@gmail.com",
             to: email,
             subject: "Your Login Code",
             text: `Your code is: ${code}`
