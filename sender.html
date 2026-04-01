@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cookie</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Orbitron', sans-serif;
+}
+
+body {
+    height: 100vh;
+    background: black;
+    overflow: hidden;
+    color: white;
+}
+
+/* canvas bg */
+#bg {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: -1;
+}
+
+/* cursor */
+.cursor {
+    position: fixed;
+    width: 20px;
+    height: 20px;
+    background: cyan;
+    border-radius: 50%;
+    pointer-events: none;
+    box-shadow: 0 0 20px cyan, 0 0 40px cyan;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+}
+
+/* sidebar */
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 80px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    transition: 0.3s;
+    padding-top: 20px;
+}
+
+.sidebar:hover {
+    width: 200px;
+}
+
+.sidebar button {
+    width: 100%;
+    padding: 15px;
+    background: none;
+    border: none;
+    color: cyan;
+    text-align: left;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.sidebar button:hover {
+    background: rgba(0,255,255,0.2);
+}
+
+/* pages */
+.page {
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 55%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.page.active {
+    display: block;
+}
+
+/* glitch text */
+.glitch {
+    font-size: 34px;
+    color: cyan;
+    text-shadow: 0 0 10px cyan;
+    animation: glitch 1s infinite;
+}
+
+@keyframes glitch {
+    0% { text-shadow: 2px 0 red, -2px 0 blue; }
+    50% { text-shadow: -2px 0 red, 2px 0 blue; }
+    100% { text-shadow: 2px 0 red, -2px 0 blue; }
+}
+
+input {
+    margin-top: 20px;
+    padding: 15px;
+    width: 300px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+    outline: none;
+}
+
+button.send {
+    margin-top: 15px;
+    padding: 15px 30px;
+    border-radius: 10px;
+    border: none;
+    background: cyan;
+    color: black;
+    cursor: pointer;
+}
+
+/* powered */
+.powered {
+    margin-top: 20px;
+    color: cyan;
+    text-shadow: 0 0 10px cyan;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="bg"></canvas>
+<div class="cursor" id="cursor"></div>
+
+<div class="sidebar">
+    <button onclick="showPage('main')">🏠 Main</button>
+    <button onclick="openHelp()">❓ Help</button>
+    <button onclick="openInvite()">🔗 Invite</button>
+    <button onclick="showPage('more')">📂 More</button>
+</div>
+
+<!-- MAIN PAGE -->
+<div class="page active" id="main">
+    <div class="glitch">test</div>
+
+    <input type="text" id="messageInput" placeholder="Type something...">
+    <br>
+    <button class="send" onclick="sendMessage()">Send</button>
+
+    <div class="powered">⚡ Powered by AWP & SWIFTIES ⚡</div>
+</div>
+
+<!-- MORE PAGE -->
+<div class="page" id="more">
+    <div class="glitch">Coming Soon</div>
+</div>
+
+<script>
+
+/* cursor */
+document.addEventListener("mousemove", e => {
+    const c = document.getElementById("cursor");
+    c.style.left = e.clientX + "px";
+    c.style.top = e.clientY + "px";
+});
+
+/* page switch */
+function showPage(id) {
+    document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+}
+
+/* links */
+function openHelp() {
+    window.open("https://discord.com/users/1269285660834140215", "_blank");
+}
+
+function openInvite() {
+    window.open("https://discord.gg/zEtZCQ95eT", "_blank");
+}
+
+/* send to backend */
+const backendUrl = "https://secure-backend01.onrender.com"; // your backend URL
+
+async function sendMessage() {
+    const msg = document.getElementById("messageInput").value.trim();
+    if(!msg) return alert("Please type a message");
+
+    await fetch(backendUrl + "/send", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ message: msg })
+    });
+
+    alert("Sent!");
+    document.getElementById("messageInput").value = "";
+}
+
+/* 3D particles FIXED */
+const canvas = document.getElementById("bg");
+const ctx = canvas.getContext("2d");
+
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+let particles = [];
+
+/* FIX: centered spread */
+for(let i=0;i<200;i++){
+    particles.push({
+        x: (Math.random() - 0.5) * canvas.width,
+        y: (Math.random() - 0.5) * canvas.height,
+        z: Math.random() * 1000
+    });
+}
+
+function draw(){
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    particles.forEach(p=>{
+        p.z -= 2;
+        if(p.z <= 0) p.z = 1000;
+
+        let k = 128 / p.z;
+
+        let x = p.x * k + canvas.width/2;
+        let y = p.y * k + canvas.height/2;
+
+        let size = (1 - p.z/1000) * 3;
+
+        ctx.fillStyle = "cyan";
+        ctx.fillRect(x,y,size,size);
+    });
+
+    requestAnimationFrame(draw);
+}
+draw();
+
+</script>
+
+</body>
+</html>
