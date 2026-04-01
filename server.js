@@ -1,120 +1,93 @@
-const express = require("express");
-const nodemailer = require("nodemailer");
-const cors = require("cors");
-const fs = require("fs");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Secure Message Dashboard</title>
+<style>
+body { font-family: Arial, sans-serif; background: #111; color: #eee; display: flex; justify-content: center; align-items: center; height: 100vh; margin:0; }
+#verifyCode, #dashboard { display: none; }
+input, button { padding: 10px; margin:5px; border-radius:5px; border:none; }
+button { cursor:pointer; background:#ff3b3b; color:white; }
+#messages { max-height: 400px; overflow-y: auto; margin-top:10px; border:1px solid #444; padding:5px; width: 400px; }
+.message { background:#222; margin:5px 0; padding:5px; border-radius:5px; display:flex; justify-content:space-between; }
+</style>
+</head>
+<body>
 
-const app = express();
-app.use(express.json());
-app.use(cors());
+<!-- VERIFY CODE SCREEN -->
+<div id="verifyCode">
+  <h2>Enter Access Code</h2>
+  <input type="text" id="accessCodeInput" placeholder="Enter code"><br>
+  <button id="verifyAccessCode">Verify</button>
+  <p id="verifyStatus"></p>
+</div>
 
-// 📁 LOAD SAVED MESSAGES
-let messages = [];
-if (fs.existsSync("messages.json")) {
-    messages = JSON.parse(fs.readFileSync("messages.json"));
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <h2>Messages (<span id="msgCount">0</span>)</h2>
+  <div id="messages"></div>
+  <button id="logout">Logout</button>
+</div>
+
+<script>
+const backendUrl = "https://secure-backend01.onrender.com"; // your backend URL
+let accessGranted = false;
+
+// DOM elements
+const verifyDiv = document.getElementById("verifyCode");
+const dashboardDiv = document.getElementById("dashboard");
+
+verifyDiv.style.display = "block";
+
+// VERIFY ACCESS CODE
+document.getElementById("verifyAccessCode").onclick = () => {
+    const code = document.getElementById("accessCodeInput").value.trim();
+    if(code === "Suka_01"){ // ✅ predefined code
+        accessGranted = true;
+        verifyDiv.style.display = "none";
+        dashboardDiv.style.display = "block";
+        loadMessages();
+    } else {
+        document.getElementById("verifyStatus").innerText = "Wrong code! Access denied.";
+    }
+};
+
+// LOAD MESSAGES FROM BACKEND
+async function loadMessages(){
+  if(!accessGranted) return;
+  const res = await fetch(backendUrl + "/messages");
+  const msgs = await res.json();
+  const container = document.getElementById("messages");
+  container.innerHTML = "";
+  msgs.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "message";
+    div.innerHTML = `<span>${m.message} <small>(${m.date})</small></span><button onclick="deleteMsg(${m.id})">Delete</button>`;
+    container.appendChild(div);
+  });
+  document.getElementById("msgCount").innerText = msgs.length;
 }
 
-// 💾 SAVE FUNCTION
-function saveMessages() {
-    fs.writeFileSync("messages.json", JSON.stringify(messages, null, 2));
+// DELETE MESSAGE
+async function deleteMsg(id){
+  if(!accessGranted) return;
+  await fetch(backendUrl + "/delete/" + id, { method:"DELETE" });
+  loadMessages();
 }
 
-// 🔐 STORAGE
-let otpStore = {};
-let sessions = {};
+// LOGOUT
+document.getElementById("logout").onclick = () => {
+  accessGranted = false;
+  dashboardDiv.style.display = "none";
+  verifyDiv.style.display = "block";
+};
 
-// 🔐 EMAIL CONFIG (PUT YOUR NEW APP PASSWORD HERE)
-const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-        user: "orixclan01@gmail.com",
-        pass: "Suka_011" 
-    }
-});
+// OPTIONAL: auto-refresh messages every 5s
+setInterval(() => {
+  if(accessGranted) loadMessages();
+}, 5000);
 
-// 🏠 HOME ROUTE
-app.get("/", (req, res) => {
-    res.send("Backend is running 🔥");
-});
-
-// 📩 SEND MESSAGE
-app.post("/send", (req, res) => {
-    const { message } = req.body;
-
-    const newMsg = {
-        id: Date.now(),
-        message,
-        date: new Date().toLocaleString()
-    };
-
-    messages.push(newMsg);
-    saveMessages();
-
-    res.send({ success: true, count: messages.length });
-});
-
-// 🔢 REQUEST OTP
-app.post("/request-otp", async (req, res) => {
-    const { email } = req.body;
-
-    const code = Math.floor(100000 + Math.random() * 900000);
-    otpStore[email] = code;
-
-    try {
-        await transporter.sendMail({
-            from: "orixclan01@gmail.com",
-            to: email,
-            subject: "Your Login Code",
-            text: `Your code is: ${code}`
-        });
-
-        res.send({ success: true });
-    } catch (err) {
-        console.log(err);
-        res.send({ success: false });
-    }
-});
-
-// ✅ VERIFY OTP
-app.post("/verify-otp", (req, res) => {
-    const { email, code } = req.body;
-
-    if (otpStore[email] == code) {
-        const token = Math.random().toString(36);
-        sessions[token] = true;
-
-        return res.send({ success: true, token });
-    }
-
-    res.send({ success: false });
-});
-
-// 🔒 GET MESSAGES
-app.get("/messages", (req, res) => {
-    const token = req.headers.authorization;
-
-    if (!sessions[token]) {
-        return res.status(403).send("Unauthorized");
-    }
-
-    res.send(messages);
-});
-
-// ❌ DELETE MESSAGE
-app.delete("/delete/:id", (req, res) => {
-    const token = req.headers.authorization;
-
-    if (!sessions[token]) {
-        return res.status(403).send("Unauthorized");
-    }
-
-    const id = parseInt(req.params.id);
-
-    messages = messages.filter(m => m.id !== id);
-    saveMessages();
-
-    res.send({ success: true });
-});
-
-// 🚀 START SERVER (RENDER COMPATIBLE)
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Server running..."));
+</script>
+</body>
+</html>
